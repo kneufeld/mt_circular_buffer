@@ -7,10 +7,10 @@ test: all
 
 ## Target name. Use base name if making a library.
 ## Destination is where the target should end up when 'make install'
-TARGET=circular_tests
+TARGET=mt_circular_buffer_tests
 DESTINATION=.
 	
-OBJECTS = circular_tests.o
+OBJECTS = mt_circular_buffer_tests.o
 
 ## None of these can be blank (fill with '.' if nothing)
 ## OBJ_DIR where to put object files when compiling

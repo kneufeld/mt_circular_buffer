@@ -1,2 +1,3 @@
 tests/.obj/
 tests/circular_tests
+mt_circular_buffer_tests

@@ -10,16 +10,13 @@
 
 using namespace std;
 
-#include "circular_buffer.h"
+#include "mt_circular_buffer.h"
 
-class circular_tests : public CPPUNIT_NS::TestFixture
+class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
 {
     public:
 
     mt_circular_buffer::pointer cb;
-
-    circular_tests() {}
-    ~circular_tests() {}
 
     void setUp()
     {
@@ -147,7 +144,7 @@ class circular_tests : public CPPUNIT_NS::TestFixture
     {
     }
 
-    CPPUNIT_TEST_SUITE( circular_tests );
+    CPPUNIT_TEST_SUITE( mt_circular_buffer_tests );
     CPPUNIT_TEST( test_size );
     CPPUNIT_TEST( test_writing );
     CPPUNIT_TEST( test_writing2 );
@@ -158,7 +155,7 @@ class circular_tests : public CPPUNIT_NS::TestFixture
     CPPUNIT_TEST_SUITE_END();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION( circular_tests );
+CPPUNIT_TEST_SUITE_REGISTRATION( mt_circular_buffer_tests );
 
 int main( int argc, char** argv )
 {
@@ -176,7 +173,6 @@ int main( int argc, char** argv )
     // insert test-suite at test-runner by registry
     CppUnit::TestRunner testrunner;
     testrunner.addTest (CppUnit::TestFactoryRegistry::getRegistry().makeTest() );
-    //testrunner.addTest( circular_tests::suite() );
     testrunner.run( controller );
 
     // output results in compiler-format
