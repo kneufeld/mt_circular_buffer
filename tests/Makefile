@@ -9,7 +9,7 @@ test: all
 ## Destination is where the target should end up when 'make install'
 TARGET=mt_circular_buffer_tests
 DESTINATION=.
-	
+
 OBJECTS = mt_circular_buffer_tests.o
 
 ## None of these can be blank (fill with '.' if nothing)

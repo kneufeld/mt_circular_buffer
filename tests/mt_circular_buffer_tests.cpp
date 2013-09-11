@@ -14,13 +14,13 @@ using namespace std;
 
 class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
 {
-    public:
+public:
 
     mt_circular_buffer::pointer cb;
 
     void setUp()
     {
-        cb.reset( new mt_circular_buffer(4) );
+        cb.reset( new mt_circular_buffer( 4 ) );
         CPPUNIT_ASSERT( cb );
     }
 
@@ -42,16 +42,16 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
     {
         char b = 0;
 
-        cb->write(&b,1);
+        cb->write( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 1, cb->size() );
-       
-        cb->write(&b,1);
+
+        cb->write( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
 
-        cb->write(&b,1);
+        cb->write( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 3, cb->size() );
 
-        cb->write(&b,1);
+        cb->write( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->full() );
@@ -63,10 +63,10 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
     {
         short b = 0;
 
-        cb->write( (char*)&b, sizeof(b) );
+        cb->write( ( char* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
-        
-        cb->write( (char*)&b, sizeof(b) );
+
+        cb->write( ( char* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->full() );
@@ -76,30 +76,31 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
     {
         short b = 0;
 
-        cb->write( (char*)&b, sizeof(b) );
+        cb->write( ( char* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
-       
+
         b = 1;
-        cb->write( (char*)&b, sizeof(b) );
+        cb->write( ( char* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
 
-        auto async_reader = [this](){
-                            short s = 10;
-                            cb->read((char*)&s,sizeof(s)); 
-                            CPPUNIT_ASSERT_EQUAL( short(0),s );
-                        };
+        auto async_reader = [this]()
+        {
+            short s = 10;
+            cb->read( ( char* )&s, sizeof( s ) );
+            CPPUNIT_ASSERT_EQUAL( short( 0 ), s );
+        };
 
         std::future<void> reader = std::async( std::launch::async, async_reader );
 
         b = 2;
-        cb->write( (char*)&b, sizeof(b) );
+        cb->write( ( char* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
 
-        cb->read( (char*)&b, sizeof(b) );
-        CPPUNIT_ASSERT_EQUAL( short(1), b );
+        cb->read( ( char* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( short( 1 ), b );
 
-        cb->read( (char*)&b, sizeof(b) );
-        CPPUNIT_ASSERT_EQUAL( short(2), b );
+        cb->read( ( char* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( short( 2 ), b );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
@@ -107,28 +108,29 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
     void test_reading()
     {
         char b = 1;
-        cb->write(&b,1);
+        cb->write( &b, 1 );
 
         b = 0;
         cb->read( &b, 1 );
 
-        CPPUNIT_ASSERT_EQUAL( (char)1, b );
+        CPPUNIT_ASSERT_EQUAL( ( char )1, b );
         CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
 
     void test_reading2()
     {
-        auto async_writer = [this](){
-                            char s = 'x';
-                            cb->write((char*)&s,sizeof(s)); 
-                            s = 'y';
-                            cb->write((char*)&s,sizeof(s)); 
-                        };
+        auto async_writer = [this]()
+        {
+            char s = 'x';
+            cb->write( ( char* )&s, sizeof( s ) );
+            s = 'y';
+            cb->write( ( char* )&s, sizeof( s ) );
+        };
 
         std::future<void> writer = std::async( std::launch::async, async_writer );
 
-        char b ='z';
+        char b = 'z';
 
         cb->read( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 'x', b );
@@ -139,7 +141,7 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
         CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
-    
+
     void test_reading3()
     {
     }
@@ -172,7 +174,7 @@ int main( int argc, char** argv )
 
     // insert test-suite at test-runner by registry
     CppUnit::TestRunner testrunner;
-    testrunner.addTest (CppUnit::TestFactoryRegistry::getRegistry().makeTest() );
+    testrunner.addTest( CppUnit::TestFactoryRegistry::getRegistry().makeTest() );
     testrunner.run( controller );
 
     // output results in compiler-format
