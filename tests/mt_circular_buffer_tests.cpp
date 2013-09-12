@@ -105,6 +105,23 @@ public:
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
 
+    void test_writing4()
+    {
+        std::string input("this is a really long string");
+        char output[256];
+
+        auto async_reader = [&]()
+        {
+            cb->read( output, input.size() );
+        };
+
+        std::future<void> reader = std::async( std::launch::async, async_reader );
+
+        cb->write( input.data(), input.size() );
+
+        CPPUNIT_ASSERT( input == output );
+    }
+
     void test_reading()
     {
         char b = 1;
@@ -142,6 +159,21 @@ public:
 
     void test_reading3()
     {
+        std::string input("this is a really long string");
+        char output[256];
+        output[ input.size() ] = 0; // we can either null terminate this string or read/write +1
+
+        auto async_writer = [&]()
+        {
+            cb->write( input.data(), input.size() );
+        };
+
+        std::future<void> writer = std::async( std::launch::async, async_writer );
+
+        cb->read( output, input.size() );
+
+        //cout << std::endl << input << std::endl << output << std::endl;
+        CPPUNIT_ASSERT( input == output );
     }
 
     CPPUNIT_TEST_SUITE( mt_circular_buffer_tests );
@@ -149,6 +181,7 @@ public:
     CPPUNIT_TEST( test_writing );
     CPPUNIT_TEST( test_writing2 );
     CPPUNIT_TEST( test_writing3 );
+    CPPUNIT_TEST( test_writing4 );
     CPPUNIT_TEST( test_reading );
     CPPUNIT_TEST( test_reading2 );
     CPPUNIT_TEST( test_reading3 );
