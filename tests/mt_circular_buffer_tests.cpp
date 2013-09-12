@@ -122,9 +122,7 @@ public:
     {
         auto async_writer = [this]()
         {
-            char s = 'x';
-            cb->write( ( char* )&s, sizeof( s ) );
-            s = 'y';
+            short s = 'x' << 8 | 'y';
             cb->write( ( char* )&s, sizeof( s ) );
         };
 
@@ -133,10 +131,10 @@ public:
         char b = 'z';
 
         cb->read( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 'x', b );
+        CPPUNIT_ASSERT_EQUAL( 'y', b );
 
         cb->read( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 'y', b );
+        CPPUNIT_ASSERT_EQUAL( 'x', b );
 
         CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
