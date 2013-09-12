@@ -1,8 +1,6 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <boost/circular_buffer.hpp>
-#include <boost/asio.hpp>
 
 // Thread safe circular buffer
 class mt_circular_buffer : private boost::noncopyable
@@ -11,8 +9,10 @@ public:
 
     typedef boost::shared_ptr<mt_circular_buffer> pointer;
 
-    mt_circular_buffer()            { buffer.set_capacity( 1024 ); }
-    mt_circular_buffer( int n )     { buffer.set_capacity( n ); }
+    mt_circular_buffer( int n = 1024 )
+    {
+        buffer.set_capacity( n );
+    }
 
     void write( const char* data, size_t count )
     {
@@ -28,15 +28,15 @@ public:
             }
         }
 
-        size_t written = 0;
+        size_t bytes_written = 0;
 
-        while( written < count )
+        while( bytes_written < count )
         {
             scoped_lock lock( monitor );
-            size_t to_write = remaining();
+            size_t to_write = ( min )( count - bytes_written, remaining() );
 
-            _write( data + written, to_write ) ;
-            written += to_write;
+            _write( data + bytes_written, to_write ) ;
+            bytes_written += to_write;
         }
     }
 
@@ -111,24 +111,17 @@ public:
 private:
 
     typedef boost::mutex::scoped_lock       scoped_lock;
-    typedef boost::asio::const_buffers_1       cbuffer;
-    typedef boost::asio::mutable_buffers_1     mbuffer;
 
     void _write( const char* data, size_t count )
     {
-        for( int i = 0; i < count; i++ )
-            buffer.push_back( data[i] );
-
+        buffer.insert( buffer.end(), data, data + count );
         buffer_not_empty.notify_one();
     }
 
     void _read( char* data, size_t count )
     {
-        for( int i = 0; i < count; i++ )
-        {
-            data[i] = buffer.front();
-            buffer.pop_front();
-        }
+        std::copy( buffer.begin(), buffer.begin() + count, data );
+        buffer.erase_begin( count );
     }
 
     size_t remaining() const
