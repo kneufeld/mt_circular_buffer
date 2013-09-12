@@ -1,3 +1,6 @@
+
+#include <algorithm>
+
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/circular_buffer.hpp>
@@ -10,11 +13,15 @@ public:
     typedef boost::shared_ptr<mt_circular_buffer> pointer;
 
     mt_circular_buffer( int n = 1024 )
+    : m_total_read(0), m_total_written(0)
     {
         buffer.set_capacity( n );
     }
 
-    void write( const char* data, size_t count )
+    size_t total_read()     const { return m_total_read; }
+    size_t total_written()  const { return m_total_written; }
+
+    size_t write( const unsigned char* data, size_t count )
     {
         {
             // this redundant looking scope is not redundant
@@ -23,8 +30,7 @@ public:
 
             if( count < remaining() )
             {
-                _write( data, count );
-                return;
+                return _write( data, count );
             }
         }
 
@@ -33,22 +39,24 @@ public:
         while( bytes_written < count )
         {
             scoped_lock lock( monitor );
-            size_t to_write = ( min )( count - bytes_written, remaining() );
+            size_t to_write = ( std::min )( count - bytes_written, remaining() );
 
             _write( data + bytes_written, to_write ) ;
             bytes_written += to_write;
         }
+
+        assert( bytes_written == count );
+        return bytes_written;
     }
 
-    void read( char* data, size_t count )
+    size_t read( unsigned char* data, size_t count )
     {
         {
             scoped_lock lock( monitor );
 
             if( count < buffer.size() )
             {
-                _read( data, count );
-                return;
+                return _read( data, count );
             }
         }
 
@@ -63,11 +71,21 @@ public:
                 buffer_not_empty.wait( lock );
             }
 
-            size_t to_read = ( min )( count - bytes_read, buffer.size() );
+            size_t to_read = ( std::min )( count - bytes_read, buffer.size() );
 
             _read( data + bytes_read, to_read ) ;
             bytes_read += to_read;
         }
+
+        assert( bytes_read == count );
+        return bytes_read;
+    }
+
+    size_t skip( size_t count )
+    {
+        std::vector<unsigned char> scrach(count);
+        assert( bytes_read == count );
+        return read( &scrach[0], count );
     }
 
     void clear()
@@ -77,26 +95,26 @@ public:
     }
 
     // how many bytes are currently in buffer
-    int size()
+    size_t size() const
     {
         scoped_lock lock( monitor );
         return buffer.size();
     }
 
     // how many bytes could the buffer hold
-    int capacity()
+    size_t capacity() const
     {
         scoped_lock lock( monitor );
         return buffer.capacity();
     }
 
-    bool empty()
+    bool empty() const
     {
         scoped_lock lock( monitor );
         return buffer.empty();
     }
 
-    bool full()
+    bool full() const
     {
         scoped_lock lock( monitor );
         return buffer.full();
@@ -112,16 +130,20 @@ private:
 
     typedef boost::mutex::scoped_lock       scoped_lock;
 
-    void _write( const char* data, size_t count )
+    size_t _write( const unsigned char* data, size_t count )
     {
         buffer.insert( buffer.end(), data, data + count );
+        m_total_written += count;
         buffer_not_empty.notify_one();
+        return count;
     }
 
-    void _read( char* data, size_t count )
+    size_t _read( unsigned char* data, size_t count )
     {
         std::copy( buffer.begin(), buffer.begin() + count, data );
         buffer.erase_begin( count );
+        m_total_read += count;
+        return count;
     }
 
     size_t remaining() const
@@ -130,7 +152,10 @@ private:
     }
 
     boost::condition                buffer_not_empty;
-    boost::mutex                    monitor;
-    boost::circular_buffer<char>    buffer;
+    mutable boost::mutex                    monitor;
+    boost::circular_buffer<unsigned char>    buffer;
+
+    size_t m_total_read;
+    size_t m_total_written;
 };
 
