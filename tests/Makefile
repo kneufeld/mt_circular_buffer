@@ -18,12 +18,12 @@ OBJECTS = mt_circular_buffer_tests.o
 ## INC_DIR include these other directories when looking for header files
 OBJ_DIR=.obj
 SRC_DIR=.
-INC_DIR=-I../include -I/usr/local/Cellar/cppunit/1.12.1/include -I/usr/local/Cellar/boost/1.54.0/include
+INC_DIR=-I../include -I${CSI_LIB64}/boost/include  -I/usr/include
 
 ## DEFINES pass in these extra #defines to gcc (no -D required)
 DEFINES=
 
-LDFLAGS = -L/usr/local/Cellar/cppunit/1.12.1/lib -L/usr/local/Cellar/boost/1.54.0/lib
+LDFLAGS = -L/usr/lib64
 LIBS = -lcppunit -lboost_system-mt -lboost_thread-mt
 
 ## Run make command in these directories
@@ -32,18 +32,16 @@ SUBDIRS =
 ## un/comment for debug symbols in executable
 DEBUG =
 ## optimize level 0(none) .. 3(all)
-OPTIMIZE = 0
+#OPTIMIZE = -O0
 
 DEFS = $(addprefix -D ,$(DEFINES))
 CPPFLAGS = -I$(SRC_DIR) $(INC_DIR) -std=c++11
-CFLAGS = $(DEBUG) -O$(OPTIMIZE) 
-CXXFLAGS = $(DEBUG) -O$(OPTIMIZE) -std=c++11
+CFLAGS = $(DEBUG) $(OPTIMIZE) 
+CXXFLAGS = $(DEBUG) $(OPTIMIZE) -std=c++11
 
 ## Compiler/tools information
-#CC = gcc
-CC = clang
-CXX = /usr/local/Cellar/gcc48/4.8.1/bin/g++-4.8
-#CXX = clang++
+CC = gcc
+CXX = g++
 THREADING =
 
 ### YOU PROBABLY DON'T NEED TO CHANGE ANYTHING BELOW HERE ###
