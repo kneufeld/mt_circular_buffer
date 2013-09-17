@@ -18,6 +18,7 @@ class mt_circular_buffer_tests : public CPPUNIT_NS::TestFixture
 public:
 
     mt_circular_buffer::pointer cb;
+    typedef mt_circular_buffer::byte byte;
 
     void setUp()
     {
@@ -32,9 +33,10 @@ public:
 
     void test_size()
     {
-        CPPUNIT_ASSERT_EQUAL( 4, cb->capacity() );
-        CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->capacity() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
 
+        CPPUNIT_ASSERT_EQUAL( size_t( cb->m_buffer.end() - cb->m_buffer.begin() ), cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
         CPPUNIT_ASSERT_EQUAL( false, cb->full() );
     }
@@ -53,34 +55,35 @@ public:
 
     void test_writing()
     {
-        char b = 0;
+        byte b = 0;
 
         cb->write( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 1, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )1, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( size_t( cb->m_buffer.end() - cb->m_buffer.begin() ), cb->size() );
 
         cb->write( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )2, cb->size() );
 
         cb->write( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 3, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )3, cb->size() );
 
         cb->write( &b, 1 );
-        CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->full() );
 
-        CPPUNIT_ASSERT_EQUAL( 4, cb->capacity() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->capacity() );
     }
 
     void test_writing2()
     {
         short b = 0;
 
-        cb->write( ( char* )&b, sizeof( b ) );
-        CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
+        cb->write( ( byte* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )2, cb->size() );
 
-        cb->write( ( char* )&b, sizeof( b ) );
-        CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
+        cb->write( ( byte* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->full() );
     }
@@ -89,30 +92,30 @@ public:
     {
         short b = 0;
 
-        cb->write( ( char* )&b, sizeof( b ) );
-        CPPUNIT_ASSERT_EQUAL( 2, cb->size() );
+        cb->write( ( byte* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )2, cb->size() );
 
         b = 1;
-        cb->write( ( char* )&b, sizeof( b ) );
-        CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
+        cb->write( ( byte* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
 
         auto async_reader = [this]()
         {
             short s = 10;
-            cb->read( ( char* )&s, sizeof( s ) );
+            cb->read( ( byte* )&s, sizeof( s ) );
             CPPUNIT_ASSERT_EQUAL( short( 0 ), s );
         };
 
         std::future<void> reader = std::async( std::launch::async, async_reader );
 
         b = 2;
-        cb->write( ( char* )&b, sizeof( b ) );
-        CPPUNIT_ASSERT_EQUAL( 4, cb->size() );
+        cb->write( ( byte* )&b, sizeof( b ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
 
-        cb->read( ( char* )&b, sizeof( b ) );
+        cb->read( ( byte* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( short( 1 ), b );
 
-        cb->read( ( char* )&b, sizeof( b ) );
+        cb->read( ( byte* )&b, sizeof( b ) );
         CPPUNIT_ASSERT_EQUAL( short( 2 ), b );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
@@ -120,8 +123,12 @@ public:
 
     void test_writing4()
     {
-        std::string input("this is a really long string");
+        // the following 1 byte buffer also passes this test
+        // cb.reset( new mt_circular_buffer( 1 ) );
+
+        std::string input( "this is a really long string" );
         char output[256];
+        output[ input.size() ] = 0; // we can either null terminate this string or read/write +1
 
         auto async_reader = [&]()
         {
@@ -131,20 +138,50 @@ public:
         std::future<void> reader = std::async( std::launch::async, async_reader );
 
         cb->write( input.data(), input.size() );
+        reader.get();
 
+        //cout << endl << input << endl << output << endl;
+        CPPUNIT_ASSERT( input == output );
+    }
+
+    void test_writing5()
+    {
+        // the following 1 byte buffer also passes this test
+        cb.reset( new mt_circular_buffer( 500 ) );
+
+        std::string input( "12345678" );
+        char output[256];
+        output[ 8 ] = 0; // we can either null terminate this string or read/write +1
+
+        auto async_reader = [&]()
+        {
+            cb->read( output, 4 );
+            cb->read( output + 4, 4 );
+        };
+
+        cb->write( input.data(), 6 );
+
+        std::future<void> reader = std::async( std::launch::async, async_reader );
+
+        cb->write( input.data() + 6, 2 );
+
+        reader.get();
+        cb->write( input.data(), 8 );
+
+        // cout << endl << input << endl << output << endl;
         CPPUNIT_ASSERT( input == output );
     }
 
     void test_reading()
     {
-        char b = 1;
+        byte b = 1;
         cb->write( &b, 1 );
 
         b = 0;
         cb->read( &b, 1 );
 
-        CPPUNIT_ASSERT_EQUAL( ( char )1, b );
-        CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( byte )1, b );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
 
@@ -153,7 +190,7 @@ public:
         auto async_writer = [this]()
         {
             short s = 'x' << 8 | 'y';
-            cb->write( ( char* )&s, sizeof( s ) );
+            cb->write( ( byte* )&s, sizeof( s ) );
         };
 
         std::future<void> writer = std::async( std::launch::async, async_writer );
@@ -166,13 +203,16 @@ public:
         cb->read( &b, 1 );
         CPPUNIT_ASSERT_EQUAL( 'x', b );
 
-        CPPUNIT_ASSERT_EQUAL( 0, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
         CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
     }
 
     void test_reading3()
     {
-        std::string input("this is a really long string");
+        // the following 1 byte buffer also passes this test
+        // cb.reset( new mt_circular_buffer( 1 ) );
+
+        std::string input( "this is a really long string" );
         char output[256];
         output[ input.size() ] = 0; // we can either null terminate this string or read/write +1
 
@@ -184,6 +224,7 @@ public:
         std::future<void> writer = std::async( std::launch::async, async_writer );
 
         cb->read( output, input.size() );
+        writer.get();
 
         //cout << std::endl << input << std::endl << output << std::endl;
         CPPUNIT_ASSERT( input == output );
@@ -196,6 +237,7 @@ public:
     CPPUNIT_TEST( test_writing2 );
     CPPUNIT_TEST( test_writing3 );
     CPPUNIT_TEST( test_writing4 );
+    CPPUNIT_TEST( test_writing5 );
     CPPUNIT_TEST( test_reading );
     CPPUNIT_TEST( test_reading2 );
     CPPUNIT_TEST( test_reading3 );
