@@ -14,7 +14,7 @@ public:
     typedef unsigned char byte;
 
     mt_circular_buffer( int n = 1024 )
-    : m_closed(false), m_total_read(0), m_total_written(0)
+        : m_closed( false ), m_total_read( 0 ), m_total_written( 0 )
     {
         m_buffer.set_capacity( n );
     }
@@ -58,7 +58,7 @@ public:
     template<typename T>
     size_t write( const T* data, size_t count )
     {
-        return write( reinterpret_cast<const byte*>(data), count );
+        return write( reinterpret_cast<const byte*>( data ), count );
     }
 
     // write into the buffer, this will block until the bytes have been written
@@ -93,7 +93,7 @@ public:
     template<typename T>
     size_t read( T* data, size_t count )
     {
-        return read( reinterpret_cast<byte*>(data), count );
+        return read( reinterpret_cast<byte*>( data ), count );
     }
 
     // read from the buffer, this will block until the bytes have been read or the buffer is closed
@@ -111,7 +111,7 @@ public:
                 m_buffer_not_empty.wait( lock );
             }
 
-            size_t to_read = (std::min)( count - bytes_read, m_buffer.size() );
+            size_t to_read = ( std::min )( count - bytes_read, m_buffer.size() );
             bytes_read += _read( data + bytes_read, to_read );
 
             // check after we read and not before to get the remaining
@@ -125,7 +125,7 @@ public:
     // throw way the first n bytes of the buffer
     size_t skip( size_t count )
     {
-        std::vector<byte> scrach(count);
+        std::vector<byte> scrach( count );
         return read( &scrach[0], count );
     }
 
