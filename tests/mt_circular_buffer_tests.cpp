@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include <cppunit/extensions/HelperMacros.h>
+#include <cppunit/TestAssert.h>
 #include <cppunit/TestRunner.h>
 #include <cppunit/TestResult.h>
 #include <cppunit/TestResultCollector.h>
@@ -219,7 +220,15 @@ int main( int argc, char** argv )
     // insert test-suite at test-runner by registry
     CppUnit::TestRunner testrunner;
     testrunner.addTest( CppUnit::TestFactoryRegistry::getRegistry().makeTest() );
-    testrunner.run( controller );
+
+    if( argc > 1 )
+    {
+        testrunner.run( controller, argv[1] );
+    }
+    else
+    {
+        testrunner.run( controller, "" );
+    }
 
     // output results in compiler-format
     CppUnit::CompilerOutputter compileroutputter( &result, std::cerr );
