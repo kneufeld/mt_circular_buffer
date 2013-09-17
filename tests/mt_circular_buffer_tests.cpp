@@ -38,6 +38,18 @@ public:
         CPPUNIT_ASSERT_EQUAL( false, cb->full() );
     }
 
+    void test_clear()
+    {
+        byte b = 0;
+        cb->write( &b, 1 );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )1, cb->size() );
+
+        cb->clear();
+
+        CPPUNIT_ASSERT_EQUAL( true, cb->empty() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
+    }
+
     void test_writing()
     {
         char b = 0;
@@ -178,6 +190,7 @@ public:
 
     CPPUNIT_TEST_SUITE( mt_circular_buffer_tests );
     CPPUNIT_TEST( test_size );
+    CPPUNIT_TEST( test_clear );
     CPPUNIT_TEST( test_writing );
     CPPUNIT_TEST( test_writing2 );
     CPPUNIT_TEST( test_writing3 );
