@@ -5,6 +5,12 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/circular_buffer.hpp>
 
+#if 0
+#define logging std::cout
+#else
+#define logging while(false) std::cout
+#endif
+
 // Thread safe circular buffer
 class mt_circular_buffer : private boost::noncopyable
 {
@@ -14,149 +20,205 @@ public:
     typedef unsigned char byte;
 
     mt_circular_buffer( int n = 1024 )
-    : m_total_read(0), m_total_written(0)
+        : m_closed( false ), m_total_read( 0 ), m_total_written( 0 )
     {
-        buffer.set_capacity( n );
+        m_buffer.set_capacity( n );
     }
 
-    size_t total_read()     const { scoped_lock lock( monitor ); return m_total_read; }
-    size_t total_written()  const { scoped_lock lock( monitor ); return m_total_written; }
-
-    size_t write( const char* data, size_t count )
+    // set the capactity of the buffer in bytes
+    void set_capacity( int capacity )
     {
-        return write( reinterpret_cast<const byte*>(data), count );
+        scoped_lock lock( m_monitor );
+        m_buffer.set_capacity( capacity );
     }
 
+    // close the buffer to future writes
+    // this function is very handy if you're using the mt_circular_buffer as a stream
+    // allows a read to return before it receives all of it's requested bytes
+    void close()
+    {
+        scoped_lock lock( m_monitor );
+        logging << "closing circular buffer" << std::endl;
+
+        m_closed = true;
+
+        // wake up any read that might be in progress so that it can return
+        m_buffer_not_empty.notify_one();
+    }
+
+    // return counter of how many bytes we've read (includes skipped bytes)
+    size_t total_read() const
+    {
+        scoped_lock lock( m_monitor );
+        return m_total_read;
+    }
+
+    // return counter of how many bytes we've written
+    size_t total_written()  const
+    {
+        scoped_lock lock( m_monitor );
+        return m_total_written;
+    }
+
+    // helper function so caller doesn't always have to cast
+    // caller is responsible for any and all problems from such a dangerous cast
+    template<typename T>
+    size_t write( const T* data, size_t count )
+    {
+        return write( reinterpret_cast<const byte*>( data ), count );
+    }
+
+    // write into the buffer, this will block until the bytes have been written
+    // this method handles all the locking
     size_t write( const byte* data, size_t count )
     {
+        if( m_closed )
+        {
+            throw std::runtime_error( "trying to write to a closed buffer" );
+        }
+
         size_t bytes_written = 0;
 
         while( bytes_written < count )
         {
-            scoped_lock lock( monitor );
+            scoped_lock lock( m_monitor );
 
-            while( buffer.full() )
+            if( m_buffer.full() )
             {
-                buffer_not_full.wait( lock );
+                logging << "writer waiting" << std::endl;
+                m_buffer_not_full.wait( lock );
+                logging << "writer waking" << std::endl;
             }
 
             size_t to_write = ( std::min )( count - bytes_written, remaining() );
-
-            _write( data + bytes_written, to_write ) ;
-            bytes_written += to_write;
+            bytes_written += _write( data + bytes_written, to_write );
         }
 
         //assert( bytes_written == count );
         return bytes_written;
     }
 
-    size_t read( char* data, size_t count )
+    // helper function so caller doesn't always have to cast
+    // caller is responsible for any and all problems from such a dangerous cast
+    template<typename T>
+    size_t read( T* data, size_t count )
     {
-        return read( reinterpret_cast<byte*>(data), count );
+        return read( reinterpret_cast<byte*>( data ), count );
     }
 
+    // read from the buffer, this will block until the bytes have been read or the buffer is closed
+    // this method handles all the locking
     size_t read( byte* data, size_t count )
     {
         size_t bytes_read = 0;
 
         while( bytes_read < count )
         {
-            scoped_lock lock( monitor );
+            scoped_lock lock( m_monitor );
 
-            while( buffer.empty() )
+            // we may have closed and signalled m_buffer_not_empty but we weren't waiting on it yet
+            // therefore, only wait if we're empty and we're not closed
+            if( m_buffer.empty() && ! m_closed )
             {
-                buffer_not_empty.wait( lock );
+                logging << "reader waiting" << std::endl;
+                m_buffer_not_empty.wait( lock );
+                logging << "reader waking" << std::endl;
             }
 
-            size_t to_read = ( std::min )( count - bytes_read, buffer.size() );
+            size_t to_read = ( std::min )( count - bytes_read, m_buffer.size() );
+            bytes_read += _read( data + bytes_read, to_read );
 
-            _read( data + bytes_read, to_read ) ;
-            bytes_read += to_read;
+            // don't break before reading any remainting bytes
+            // as the caller probably wants them
+            if( m_closed ) { break; }
         }
 
-        //assert( bytes_read == count );
         return bytes_read;
     }
 
+    // throw way the first n bytes of the buffer
     size_t skip( size_t count )
     {
-        std::vector<byte> scrach(count);
-        size_t bytes_read = read( &scrach[0], count );
-        //assert( bytes_read == count );
-        return bytes_read;
+        std::vector<byte> scrach( count );
+        return read( &scrach[0], count );
     }
 
+    // delete contents of buffer
     void clear()
     {
-        scoped_lock lock( monitor );
-        buffer.clear();
+        scoped_lock lock( m_monitor );
+        m_buffer.clear();
     }
 
-    // how many bytes are currently in buffer
+    // how many bytes are currently in the buffer
     size_t size() const
     {
-        scoped_lock lock( monitor );
-        return buffer.size();
+        scoped_lock lock( m_monitor );
+        return m_buffer.size();
     }
 
     // how many bytes could the buffer hold
     size_t capacity() const
     {
-        scoped_lock lock( monitor );
-        return buffer.capacity();
+        scoped_lock lock( m_monitor );
+        return m_buffer.capacity();
     }
 
+    // is the buffer empty
     bool empty() const
     {
-        scoped_lock lock( monitor );
-        return buffer.empty();
+        scoped_lock lock( m_monitor );
+        return m_buffer.empty();
     }
 
+    // is the buffer full
     bool full() const
     {
-        scoped_lock lock( monitor );
-        return buffer.full();
+        scoped_lock lock( m_monitor );
+        return m_buffer.full();
     }
 
-    void set_capacity( int capacity )
-    {
-        scoped_lock lock( monitor );
-        buffer.set_capacity( capacity );
-    }
 
 private:
 
-    friend class mt_circular_buffer_tests;
-
+    // this method does the actual writing to the internal circular buffer
     size_t _write( const byte* data, size_t count )
     {
+        logging <<"_write: " << count << std::endl;
         m_total_written += count;
-        buffer.insert( buffer.end(), data, data + count );
-        buffer_not_empty.notify_one();
+        m_buffer.insert( m_buffer.end(), data, data + count );
+        m_buffer_not_empty.notify_one(); // wake up a blocked reader
         return count;
     }
 
+    // this method does the actual reading from the internal circular buffer
     size_t _read( byte* data, size_t count )
     {
+        logging << "_read: " << count << std::endl;
         m_total_read += count;
-        std::copy( buffer.begin(), buffer.begin() + count, data );
-        buffer.erase_begin( count );
-        buffer_not_full.notify_one();
+        std::copy( m_buffer.begin(), m_buffer.begin() + count, data );
+        m_buffer.erase_begin( count );
+        m_buffer_not_full.notify_one(); // wake up a blocked writer
         return count;
     }
 
+    // how many bytes could we write before blocking
     size_t remaining() const
     {
-        return buffer.capacity() - buffer.size();
+        return m_buffer.capacity() - m_buffer.size();
     }
 
+    friend class mt_circular_buffer_tests;
     typedef boost::mutex::scoped_lock       scoped_lock;
-    boost::condition                buffer_not_empty;
-    boost::condition                buffer_not_full;
-    mutable boost::mutex            monitor;
-    boost::circular_buffer<byte>    buffer;
 
-    size_t m_total_read;
-    size_t m_total_written;
+    boost::circular_buffer<byte>            m_buffer;
+
+    boost::condition                        m_buffer_not_empty;
+    boost::condition                        m_buffer_not_full;
+    mutable boost::mutex                    m_monitor;
+    bool                                    m_closed;
+
+    size_t                                  m_total_read;
+    size_t                                  m_total_written;
 };
 
