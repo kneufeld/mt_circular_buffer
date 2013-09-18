@@ -97,6 +97,8 @@ public:
 
         byte b = 0;
         CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->read(&b,1) );
+
+        CPPUNIT_ASSERT_THROW( cb->write(&b,1), std::runtime_error );
     }
 
     void test_writing()
