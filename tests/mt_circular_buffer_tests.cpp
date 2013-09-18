@@ -157,7 +157,7 @@ public:
             cb->write( &b, 1 );
         };
 
-        std::future<void> writer = std::async( async_writer );
+        std::future<void> writer = std::async( std::launch::async, async_writer );
 
         cb->wait_for_write();
         CPPUNIT_ASSERT( "we didn't deadlock" ); // if we made it this far then we haven't deadlocked
