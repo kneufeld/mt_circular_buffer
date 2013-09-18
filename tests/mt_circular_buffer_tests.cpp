@@ -55,7 +55,55 @@ public:
         CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
     }
 
-    void test_close()
+    void test_capacity1()
+    {
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->capacity() );
+
+        cb.reset( new mt_circular_buffer( 10 ) );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )10, cb->capacity() );
+        
+        cb->set_capacity( 5 );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )5, cb->capacity() );
+    }
+
+    void test_capacity2()
+    {
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
+
+        std::string input( "1234" );
+        cb->write( input.data(), input.size() );
+
+        CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
+
+        cb->set_capacity(1); // moves end() of buffer
+
+        char b;
+        cb->read(&b,1);
+
+        CPPUNIT_ASSERT_EQUAL( '1', b ); // note: not 4
+        CPPUNIT_ASSERT_EQUAL( ( size_t )0, cb->size() );
+        CPPUNIT_ASSERT_EQUAL( ( size_t )1, cb->capacity() );
+    }
+
+    void test_capacity3()
+    {
+        std::string input( "123456" );
+
+        auto async_writer = [&]()
+        {
+            cb->write( input.data(), input.size() );
+        };
+
+        std::future<void> writer = std::async( std::launch::async, async_writer );
+
+        cb->wait_for_write(); // don't set the new capacity until the writer is blocked
+        cb->set_capacity( input.size() );
+
+        writer.get();
+        CPPUNIT_ASSERT( "we didn't deadlock" );
+    }
+
+    void test_close1()
     {
         // during development, read() would deadlock if close() tried to get the lock
         // this test would show it
@@ -88,7 +136,7 @@ public:
         // this test always passed because write() never blocked
 
         cb.reset( new mt_circular_buffer( 10 ) );
-        test_close();
+        test_close1();
     }
 
     void test_close3()
@@ -101,7 +149,51 @@ public:
         CPPUNIT_ASSERT_THROW( cb->write(&b,1), std::runtime_error );
     }
 
-    void test_writing()
+    void test_wait1()
+    {
+        auto async_writer = [&]()
+        {
+            char b = 0;
+            cb->write( &b, 1 );
+        };
+
+        std::future<void> writer = std::async( async_writer );
+
+        cb->wait_for_write();
+        CPPUNIT_ASSERT( "we didn't deadlock" ); // if we made it this far then we haven't deadlocked
+    }
+
+    void test_wait2()
+    {
+        auto async_writer = [&]()
+        {
+            char b = 1;
+            cb->write( &b, 1 );
+        };
+
+        auto async_reader = [&]()
+        {
+            char b = 0;
+            cb->read( ( byte* )&b, sizeof( b ) );
+            CPPUNIT_ASSERT_EQUAL( char( 1 ), b );
+        };
+
+        std::future<void> writer = std::async( std::launch::async, async_writer );
+        std::future<void> reader = std::async( std::launch::async, async_reader );
+
+        cb->wait_for_write();
+
+        CPPUNIT_ASSERT( "we didn't deadlock" ); // if we made it this far then we haven't deadlocked
+    }
+
+    void test_wait3()
+    {
+        cb->close();    
+        cb->wait_for_write();
+        CPPUNIT_ASSERT( "we didn't deadlock" );
+    }
+
+    void test_writing1()
     {
         byte b = 0;
 
@@ -119,7 +211,6 @@ public:
         CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->size() );
 
         CPPUNIT_ASSERT_EQUAL( true, cb->full() );
-
         CPPUNIT_ASSERT_EQUAL( ( size_t )4, cb->capacity() );
     }
 
@@ -220,7 +311,7 @@ public:
         CPPUNIT_ASSERT( input == output );
     }
 
-    void test_reading()
+    void test_reading1()
     {
         byte b = 1;
         cb->write( &b, 1 );
@@ -278,20 +369,60 @@ public:
         CPPUNIT_ASSERT( input == output );
     }
 
+    void test_skip1()
+    {
+        std::string input( "12" );
+        cb->write( input.data(), input.size() );
+        
+        cb->skip(1);
+
+        char b;
+        cb->read( &b, 1 );
+
+        CPPUNIT_ASSERT_EQUAL( '2', b );
+    }
+
+    void test_skip2()
+    {
+        std::string input( "123456" );
+
+        auto async_writer = [&]()
+        {
+            cb->write( input.data(), input.size() );
+        };
+
+        std::future<void> writer = std::async( std::launch::async, async_writer );
+        
+        cb->skip(5);
+
+        char b;
+        cb->read( &b, 1 );
+
+        CPPUNIT_ASSERT_EQUAL( '6', b );
+    }
+
     CPPUNIT_TEST_SUITE( mt_circular_buffer_tests );
     CPPUNIT_TEST( test_size );
     CPPUNIT_TEST( test_clear );
-    CPPUNIT_TEST( test_close );
+    CPPUNIT_TEST( test_capacity1 );
+    CPPUNIT_TEST( test_capacity2 );
+    CPPUNIT_TEST( test_capacity3 );
+    CPPUNIT_TEST( test_close1 );
     CPPUNIT_TEST( test_close2 );
     CPPUNIT_TEST( test_close3 );
-    CPPUNIT_TEST( test_writing );
+    CPPUNIT_TEST( test_wait1 );
+    CPPUNIT_TEST( test_wait2 );
+    CPPUNIT_TEST( test_wait3 );
+    CPPUNIT_TEST( test_writing1 );
     CPPUNIT_TEST( test_writing2 );
     CPPUNIT_TEST( test_writing3 );
     CPPUNIT_TEST( test_writing4 );
     CPPUNIT_TEST( test_writing5 );
-    CPPUNIT_TEST( test_reading );
+    CPPUNIT_TEST( test_reading1 );
     CPPUNIT_TEST( test_reading2 );
     CPPUNIT_TEST( test_reading3 );
+    CPPUNIT_TEST( test_skip1 );
+    CPPUNIT_TEST( test_skip2 );
     CPPUNIT_TEST_SUITE_END();
 };
 
