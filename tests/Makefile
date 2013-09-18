@@ -2,8 +2,14 @@
 ## all is one of: all-exec  all-libraries  all-shared  all-static
 all: all-exec
 
+LD_LIBRARY_PATH=.:../cppunit/src/cppunit/.libs
+
 test: all
-	LD_LIBRARY_PATH=. ./$(TARGET)
+	DYLD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./$(TARGET)
+
+ldd: all
+	# doesn't use DYLD path
+	DYLD_LIBRARY_PATH=${LD_LIBRARY_PATH} otool -L ./$(TARGET)
 
 ## Target name. Use base name if making a library.
 ## Destination is where the target should end up when 'make install'
@@ -18,13 +24,14 @@ OBJECTS = mt_circular_buffer_tests.o
 ## INC_DIR include these other directories when looking for header files
 OBJ_DIR=.obj
 SRC_DIR=.
-INC_DIR=-I../include -I/usr/local/Cellar/cppunit/1.12.1/include -I/usr/local/Cellar/boost/1.54.0/include
+INC_DIR=-I../include -I../cppunit/include -I/usr/local/Cellar/boost/1.54.0/include
 
 ## DEFINES pass in these extra #defines to gcc (no -D required)
 DEFINES=
 
 LDFLAGS = -L/usr/local/Cellar/cppunit/1.12.1/lib -L/usr/local/Cellar/boost/1.54.0/lib
-LIBS = -lcppunit -lboost_system-mt -lboost_thread-mt
+LDFLAGS = -L/usr/local/Cellar/boost/1.54.0/lib -L../cppunit/src/cppunit/.libs
+LIBS = -lcppunit -lboost_system-mt -lboost_thread-mt -lc++
 
 ## Run make command in these directories
 SUBDIRS =
@@ -32,18 +39,19 @@ SUBDIRS =
 ## un/comment for debug symbols in executable
 DEBUG =
 ## optimize level 0(none) .. 3(all)
-OPTIMIZE = 0
+OPTIMIZE = -O0
 
 DEFS = $(addprefix -D ,$(DEFINES))
 CPPFLAGS = -I$(SRC_DIR) $(INC_DIR) -std=c++11
-CFLAGS = $(DEBUG) -O$(OPTIMIZE) 
-CXXFLAGS = $(DEBUG) -O$(OPTIMIZE) -std=c++11
+CFLAGS = $(DEBUG) $(OPTIMIZE) 
+CXXFLAGS = $(DEBUG) $(OPTIMIZE) -std=c++11
+#-stdlib=libc++
 
 ## Compiler/tools information
-#CC = gcc
-CC = clang
+CC = gcc
+#CC = clang
 CXX = /usr/local/Cellar/gcc48/4.8.1/bin/g++-4.8
-#CXX = clang++
+CXX = clang++ -stdlib=libc++
 THREADING =
 
 ### YOU PROBABLY DON'T NEED TO CHANGE ANYTHING BELOW HERE ###
