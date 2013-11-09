@@ -9,6 +9,11 @@
 #define logging std::cout
 #else
 #define logging while(false) std::cout
+// don't use if(false) in case 'logging' is part of an if statement
+// if( foo )
+//   logging << "some string";
+// else // this else would belong to logging's if(false)
+//   return;
 #endif
 
 // Thread safe circular buffer
