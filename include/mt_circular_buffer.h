@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
@@ -58,7 +59,7 @@ public:
         m_closed = true;
         m_written = true;      // unblock wait_for_write
 
-        // wake up any reads that might be in progress so that it can return
+        // wake up any reads that might be in progress so they can return
         m_write_event.notify_all();
     }
 
