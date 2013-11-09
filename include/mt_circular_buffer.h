@@ -42,7 +42,7 @@ public:
         if( growing )
         {
             // let any blocked writers know that they have room to write
-            m_read_event.notify_one(); 
+            m_read_event.notify_one();
         }
     }
 
@@ -88,7 +88,7 @@ public:
 
         // there is no race condition because m_written can only be checked if we have the mutex
         // note this is a while loop and not an if because wait() can return spuriously. seriously.
-        // for more info see: 
+        // for more info see:
         //   http://stackoverflow.com/questions/8594591/why-does-pthread-cond-wait-have-spurious-wakeups
         while( ! m_written )
         {
