@@ -4,7 +4,7 @@ The [circular buffer](http://www.boost.org/doc/libs/1_55_0/doc/html/circular_buf
 that ships with [Boost](http://www.boost.org/) is great. However, it's
 not thread safe. This one is.
 
-Developed against and Boost 1.54 and tested with Boost 1.55.
+Developed against Boost 1.54 and tested with Boost 1.55.
 
 ## Installation
 
